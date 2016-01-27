@@ -1,4 +1,6 @@
-// test the least square method
+
+/* learn/test the least square method from gsl library */
+
 #include<gsl/gsl_fit.h>
 #include<stdio.h>
 

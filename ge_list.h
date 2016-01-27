@@ -1,6 +1,8 @@
 #ifndef __GE_LIST_H_
 #define __GE_LIST_H_
 
+#include <stdbool.h>
+
 /* store the data for a time step */
 struct _hist_elem {
 	int size;	  // size of the array
@@ -20,5 +22,6 @@ struct _history {
 extern void ge_list_init(int window_size);
 extern void ge_list_append(double *buf, int size);
 extern void ge_list_clean();
+extern bool ge_list_get_status();
 
 #endif

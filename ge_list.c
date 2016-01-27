@@ -2,6 +2,7 @@
 #include <stdlib.h>
 #include <assert.h>
 #include <string.h>
+#include <stdbool.h>
 
 #include "ge_list.h"
 
@@ -31,6 +32,14 @@ void ge_list_init(int window_size)
 	history.front = history.base;
 }
 
+/* check wether the history buf if full for estimation */
+bool ge_list_get_status() {
+	if (history.cur_size == history.win_size)
+		return true;
+	else 
+		return false;
+}
+
 /* put the newest data into the history buf, if necessary remove the oldest data */
 void ge_list_append(double *buf, int size)
 {
@@ -43,10 +52,11 @@ void ge_list_append(double *buf, int size)
 	memcpy(tmp, buf, size * sizeof(double));
 
 	if ( history.cur_size < history.win_size ) { // history buf is not full, append to the front
+		history.cur_size++;
 		history.front->array = tmp;
 		history.front->size = size;
-		history.front = history.front->next;
-		history.cur_size++;
+		if (history.cur_size < history.win_size)
+			history.front = history.front->next;
 	} else if (history.cur_size == history.win_size) { // history buf is full, replace the oldest one 
 		/* base always points to oldest one, so update it */
 		struct _hist_elem * n = history.base; 
