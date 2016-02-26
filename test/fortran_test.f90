@@ -10,7 +10,7 @@ external ge_detect_init
 external ge_detect_verify
 integer  ge_detect_verify
 
-external ge_detect_finish
+external ge_detect_finalize
 
 threshold = 0.03
 steps = 10
@@ -20,7 +20,7 @@ do i = 1, 10
     temperature(i) = 12.0
 end do
 
-call ge_detect_init(THRESHOLD_METHOD, 0, threshold)
+call ge_detect_init(THRESHOLD_METHOD, 0, threshold, 1)
 
 do curr_step = 1, steps
     print *, "in step : ", curr_step
@@ -38,13 +38,13 @@ do curr_step = 1, steps
     end do
 
     res = -1
-    res = ge_detect_verify(temperature, buf_size)
+    res = ge_detect_verify(temperature, buf_size, curr_step)
     print *, 'res = ', res
     	if (res == FAULT) then
         print *, "a fault detected with max change ratio : ", max
     end if
 end do
 
-call ge_detect_finish()
+call ge_detect_finalize()
 
 end program test_f

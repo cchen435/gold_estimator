@@ -7,6 +7,7 @@
 dmethods method = NONE;
 double threshold = 0.0;
 extern struct _hist_buffer history;
+int ge_freq;
 
 /** GE Internal API definition*/
 
@@ -16,11 +17,11 @@ extern struct _hist_buffer history;
  */
 int ge_detect_internal_threshold(vec_double_t ratio)
 {
-    int i;
-    for (i = 0; i < ratio.size; i++)
-	if (fabs(ratio.array[i]) > threshold)
-	    return FAULT;
-    return NORMAL;
+	int i;
+	for (i = 0; i < ratio.size; i++)
+		if (fabs(ratio.array[i]) > threshold)
+			return GE_FAULT;
+	return GE_NORMAL;
 }
 
 /**
@@ -33,17 +34,16 @@ int ge_detect_internal_threshold(vec_double_t ratio)
  */
 int ge_detect_internal_tthreshold(vec_double_t ratio)
 {
-    int i;
-    double mean = ge_mean(ratio.array, 1, ratio.size);
+	int i;
+	double mean = ge_mean(ratio.array, 1, ratio.size);
 #ifdef DEBUG_INTERNAL
-    fprintf(stderr, "method: %s, mean ratio: %f, thresh: %f\n", \
-            __func__, mean, threshold);
+	fprintf(stderr, "method: %s, mean ratio: %f, thresh: %f\n",
+		__func__, mean, threshold);
 #endif
-    if (fabs(mean) > threshold)
-	    return FAULT;
-    return NORMAL;
+	if (fabs(mean) > threshold)
+		return GE_FAULT;
+	return GE_NORMAL;
 }
-
 
 /**
  * ge_detect_internal_mean - using mean method to detect error
@@ -54,28 +54,32 @@ int ge_detect_internal_tthreshold(vec_double_t ratio)
  */
 int ge_detect_internal_mean(vec_double_t ratio)
 {
-    int i, j, steps, elems, res=NORMAL;
-    double mean, stdv;
-    double *buffer = history.data;
+	int i, j, steps, elems;
+	static int res;
+	double *buffer = history.data;
 
-    int full = ge_buffer_status();
-    if ( full ) {
-        steps = history.steps;
-        elems = history.dim;
+	int full = ge_buffer_status();
 
-        for (i = 0; i < elems; i++) {
-            stdv = ge_stdv(&buffer[i], elems, steps);
-            mean = ge_mean(&buffer[i], elems, steps);
-            if (fabs(ratio.array[i] - mean) > threshold * stdv){
-                res = FAULT;
-                break;
-            }
-        }
-    } else {
-        printf("mean: buffer is not full\n");
-    }
-    ge_buffer_append(ratio.array, ratio.size);
-    return res;
+	res = GE_NORMAL;
+
+	if (full) {
+		steps = history.steps;
+		elems = history.dim;
+
+		for (i = 0; i < elems; i++) {
+			double mean, stdv;
+			stdv = ge_stdv(&buffer[i], elems, steps);
+			mean = ge_mean(&buffer[i], elems, steps);
+			if (fabs(ratio.array[i] - mean) > threshold * stdv) {
+				res = GE_FAULT;
+				break;
+			}
+		}
+	} else {
+		printf("mean: buffer is not full\n");
+	}
+	ge_buffer_append(ratio.array, ratio.size);
+	return res;
 }
 
 /**
@@ -88,43 +92,43 @@ int ge_detect_internal_mean(vec_double_t ratio)
  */
 int ge_detect_internal_linear_fit(vec_double_t ratio)
 {
-    double *x, *buffer;
-    double a, b, predict, stdv;
-    int i, steps, elems, res = NORMAL;
+	double *x, *buffer;
+	double a, b, predict, stdv;
+	int i, steps, elems, res = GE_NORMAL;
 
-    // check whether history buf is full, if not just append current data
-    int full = ge_buffer_status();
-    if (full) {
-        steps = history.steps;
-        elems = history.dim;
-        buffer = history.data;
-        
-        x = (double *) malloc(steps * sizeof(double));
-        if (x == NULL) {
-            log_err("linear_fit, mem allocation error");
-            exit(EXIT_FAILURE);
-        }
-        for (i = 0; i < steps; i++)
-            x[i] = i;
-       
-        // check whether a fault detected
-        for (i = 0; i < ratio.size; i++) {
-            stdv = ge_stdv(&buffer[i], elems, steps);
-            ge_lstsq(x, &buffer[i], &a, &b, steps, elems);
-            predict = a * (steps+ 1) + b;
-            if (fabs(ratio.array[i] - predict) > threshold * stdv) {
-	        //log_err("fault detected\n");
-	        //free(predit);
-	        //exit(-1);
-	        res = FAULT;
-	        break;
-            }
-        }
-    } else {
-        printf("linear: buffer is not full\n");
-    }
-    ge_buffer_append(ratio.array, ratio.size);
-    return res;
+	// check whether history buf is full, if not just append current data
+	int full = ge_buffer_status();
+	if (full) {
+		steps = history.steps;
+		elems = history.dim;
+		buffer = history.data;
+
+		x = (double *)malloc(steps * sizeof(double));
+		if (x == NULL) {
+			log_err("linear_fit, mem allocation error");
+			exit(EXIT_FAILURE);
+		}
+		for (i = 0; i < steps; i++)
+			x[i] = i;
+
+		// check whether a fault detected
+		for (i = 0; i < ratio.size; i++) {
+			stdv = ge_stdv(&buffer[i], elems, steps);
+			ge_lstsq(x, &buffer[i], &a, &b, steps, elems);
+			predict = a * (steps + 1) + b;
+			if (fabs(ratio.array[i] - predict) > threshold * stdv) {
+				//log_err("fault detected\n");
+				//free(predit);
+				//exit(-1);
+				res = GE_FAULT;
+				break;
+			}
+		}
+	} else {
+		printf("linear: buffer is not full\n");
+	}
+	ge_buffer_append(ratio.array, ratio.size);
+	return res;
 }
 
 /**
@@ -136,39 +140,38 @@ int ge_detect_internal_linear_fit(vec_double_t ratio)
  */
 int ge_detect_internal_tmean(vec_double_t ratio)
 {
-    int i,steps, elems, res=NORMAL, full;
-    double step_mean, hist_mean, stdv, *buffer;
-    
-    buffer = history.data;
-    steps = history.steps;
-    elems = history.dim;
+	int i, steps, elems, res = GE_NORMAL, full;
+	double step_mean, hist_mean, stdv, *buffer;
 
-    // timestep based method, history just has one data, mean change ratio
-    if (elems != 1) {
-        log_err("dimension size not match with tmean method\n");
-        exit(EXIT_FAILURE);
-    }
+	buffer = history.data;
+	steps = history.steps;
+	elems = history.dim;
 
-    // mean value of current timestep
-    step_mean = ge_mean(ratio.array, 1, ratio.size);
+	// timestep based method, history just has one data, mean change ratio
+	if (elems != 1) {
+		log_err("dimension size not match with tmean method\n");
+		exit(EXIT_FAILURE);
+	}
+	// mean value of current timestep
+	step_mean = ge_mean(ratio.array, 1, ratio.size);
 
-    full = ge_buffer_status();
-    if (full) {
-        // mean and stdv values of means of history steps
-        hist_mean = ge_mean(buffer, elems, steps);
-        stdv = ge_stdv(buffer, elems, steps);
-        if (fabs(step_mean - hist_mean) > threshold * stdv)
-            res = FAULT;
+	full = ge_buffer_status();
+	if (full) {
+		// mean and stdv values of means of history steps
+		hist_mean = ge_mean(buffer, elems, steps);
+		stdv = ge_stdv(buffer, elems, steps);
+		if (fabs(step_mean - hist_mean) > threshold * stdv)
+			res = GE_FAULT;
 #ifdef DEBUG_INTERNAL
-        fprintf(stderr, "method: %s, hist_mean: %f, stdv: %f,"
-                "mean_ratio: %f thresh: %f, diff: %f, res: %d\n", \
-                __func__, hist_mean, stdv, step_mean, threshold, \
-                fabs(step_mean - hist_mean), res);
+		fprintf(stderr, "method: %s, hist_mean: %f, stdv: %f,"
+			"mean_ratio: %f thresh: %f, diff: %f, res: %d\n",
+			__func__, hist_mean, stdv, step_mean, threshold,
+			fabs(step_mean - hist_mean), res);
 #endif
-    }
+	}
 
-    ge_buffer_append(&step_mean, elems);
-    return res;
+	ge_buffer_append(&step_mean, elems);
+	return res;
 }
 
 /**
@@ -180,49 +183,46 @@ int ge_detect_internal_tmean(vec_double_t ratio)
  * target for the mean value of each time step, 
  * not for each location
  */
-int ge_detect_internal_tmean_linear(vec_double_t ratio)
+int ge_detect_internal_tmean_linear(vec_double_t ratio, int step)
 {
-    int i,steps, elems, full, res=NORMAL;
-    double step_mean, hist_mean, a, b, predict, stdv, *x, *buffer;
-    
-    buffer = history.data;
-    steps = history.steps;
-    elems = history.dim;
+	int i, steps, elems, full, res = GE_NORMAL;
+	double step_mean, hist_mean, a, b, predict, stdv, *x, *buffer;
 
-    // timestep based method, history just has one data, mean change ratio
-    if (elems != 1) {
-        log_err("dimension size not match with tmean_linear method\n");
-        exit(EXIT_FAILURE);
-    }
+	buffer = history.data;
+	steps = history.steps;
+	elems = history.dim;
 
-    // calc mean value of current time step
-    step_mean = ge_mean(ratio.array, 1, ratio.size);
+	// timestep based method, history just has one data, mean change ratio
+	if (elems != 1) {
+		log_err("dimension size not match with tmean_linear method\n");
+		exit(EXIT_FAILURE);
+	}
+	// calc mean value of current time step
+	step_mean = ge_mean(ratio.array, 1, ratio.size);
 
-    full = ge_buffer_status();
-    if (full) {
-        stdv = ge_stdv(buffer, elems, steps);
-        
-        x = (double *) malloc(steps * sizeof(double));
-        if (x == NULL) {
-            log_err("linear_fit, mem allocation error");
-            exit(EXIT_FAILURE);
-        }
-        for (i = 0; i < steps; i++)
-            x[i] = i;
-        
-        ge_lstsq(x, buffer, &a, &b, steps, elems);
-        predict = a * (steps + 1) + b;
+	full = ge_buffer_status();
+	if (full && step % ge_freq == 0) {
+		stdv = ge_stdv(buffer, elems, steps);
+
+		x = (double *)malloc(steps * sizeof(double));
+		if (x == NULL) {
+			log_err("linear_fit, mem allocation error");
+			exit(EXIT_FAILURE);
+		}
+		for (i = 0; i < steps; i++)
+			x[i] = i;
+
+		ge_lstsq(x, buffer, &a, &b, steps, elems);
+		predict = a * (steps + 1) + b;
 #ifdef DEBUG_INTERNAL
-        fprintf(stderr, "method: %s, predict: %f, stdv: %f, \
-                mean_ratio: %f thresh: %f\n", \
-                __func__, predict, stdv, step_mean, threshold);
+		fprintf(stderr, "method: %s, predict: %f, stdv: %f, \
+                mean_ratio: %f thresh: %f\n", __func__, predict, stdv, step_mean, threshold);
 #endif
-        if (fabs(predict - step_mean) > threshold * stdv) {
-            res = FAULT;
-        }
-    }
-    
-    ge_buffer_append(&step_mean, elems);
-    return res;
-}
+		if (fabs(predict - step_mean) > threshold * stdv) {
+			res = GE_FAULT;
+		}
+	}
 
+	ge_buffer_append(&step_mean, elems);
+	return res;
+}
