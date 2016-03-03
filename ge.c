@@ -12,11 +12,20 @@
 #include "common.h"
 #include "ge_buffer.h"
 
+#if USE_MPI
+#include <mpi.h>
+#endif
+
 extern dmethods method;
 extern double threshold;
 extern struct _hist_buffer history;
 
 extern int ge_freq;
+
+#if USE_MPI
+extern int ge_rank;
+extern int ge_comm_size;
+#endif 
 
 #if DEBUG
 //#if USING_MPI
@@ -64,6 +73,11 @@ void ge_detect_init(dmethods m, int array_size, int win_size, double thresh,
 	method = m;
 	threshold = thresh;
 	ge_freq = freq;
+
+#if USE_MPI
+	MPI_Comm_rank(MPI_COMM_WORLD, &ge_rank);
+	MPI_Comm_size(MPI_COMM_WORLD, &ge_comm_size);
+#endif
 
 	switch (m) {
 	case THRESHOLD:
@@ -187,44 +201,72 @@ int ge_detect_verify(double *buf, int buf_size, int step)
 	default:
 		log_err("method not defined\n");
 	}
+
 #if GE_RESTART
 	if (result == GE_FAULT) {
 		mean = ge_mean(buf, 1, buf_size);
-		FILE *fp = fopen("ge_detect_mean.txt", "r+");
-		if (fp == NULL)
-			fp = fopen("ge_detect_mean.txt", "w+");
+#if USE_MPI
+		int tmp_sum, tmp_size;
+		tmp_sum = mean * buf_size;
+		tmp_size = buf_size;
 
-		/** check whether a fault has been record 
-		 *  if it has been recorded (timestep) and the statitic value 
-		 *  is the same with current statitic, we consider current fault 
-		 *  as false positive and continue
-		 */
-		while (!feof(fp)) {
-			size = fscanf(fp, "%d %lf\n", &tmp_step, &tmp_mean);
-			if (size == 0)
-				break;
-			if (tmp_step == step && abs(tmp_mean - mean) < 0.00001) {
-				result = GE_NORMAL;
-				break;
+		MPI_Allreduce(&tmp_sum, &tmp_sum, 1, MPI_DOUBLE, MPI_SUM, MPI_COMM_WORLD);
+		MPI_Allreduce(&tmp_size, &tmp_size, 1, MPI_DOUBLE, MPI_SUM, MPI_COMM_WORLD);
+		mean = tmp_sum/tmp_size;
+
+		if (ge_rank == 0)
+#endif 	
+		{
+			/* first assume file exists, and try to open a file
+			 * with 'read' mode, if failed means file not exist
+			 * and open it with write operation
+			 */
+			FILE *fp = fopen("ge_detect_mean.txt", "r+");
+			if (fp == NULL)
+				fp = fopen("ge_detect_mean.txt", "w+");
+
+			/** check whether a fault has been record 
+			 *  if it has been recorded (timestep) and the statitic value 
+			 *  is the same with current statitic, we consider current fault 
+			 *  as false positive and continue
+			 */
+			while (!feof(fp)) {
+				size = fscanf(fp, "%d %lf\n", &tmp_step, &tmp_mean);
+				if (size == 0)
+					break;
+				if (tmp_step == step && abs(tmp_mean - mean) < 0.00001) {
+					result = GE_NORMAL;
+					break;
+				}
 			}
+			// no match record, means the fault first appears, record it
+			if (result == GE_FAULT)
+				fprintf(fp, "%d %f\n", step, mean);
+			fclose(fp);
 		}
-		// no match record, means the fault first appears, record it
-		if (result == GE_FAULT)
-			fprintf(fp, "%d %f\n", step, mean);
-		fclose(fp);
 	}
 #endif
 	if (result == GE_FAULT) {
-		//faults.fsteps[faults.num]=faults.tsteps;
-		faults.fsteps[faults.num] = step;
-		faults.num++;
+#if USE_MPI
+		if (ge_rank == 0)
+#endif
+		{
+			//faults.fsteps[faults.num]=faults.tsteps;
+			faults.fsteps[faults.num] = step;
+			faults.num++;
+		}
 	}
 	//free up the ratio array
 	free(ratio.array);
 #if DEBUG
 	endt = timer();
-	printf("\nmalloc: %f, abs: %f, ratio: %f, middle: %f, end: %f\n\n", \
+#if USE_MPI
+	if (ge_rank == 0) 
+#endif
+	{
+		printf("\nmalloc: %f, abs: %f, ratio: %f, middle: %f, end: %f\n\n", \
 			(malloct-startt), (abst-malloct), (ratiot-abst), (middlet-startt), (endt-startt));
+	}
 #endif
 	return result;
 }
@@ -235,6 +277,12 @@ void ge_detect_finalize()
 	if (last.array)
 		free(last.array);
 	ge_buffer_clean();
+
+#if USE_MPI
+	if (ge_rank != 0) {
+		return;
+	}
+#endif 
 
 	printf("\n\nGE statistic:\nnumber of faults detected: %d\n",
 	       faults.num);
@@ -252,4 +300,5 @@ void ge_detect_finalize()
 		fprintf(fp, "%d,", faults.fsteps[i]);
 	fprintf(fp, "\n\n");
 	fclose(fp);
+
 }

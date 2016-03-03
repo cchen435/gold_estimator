@@ -1,8 +1,10 @@
-CC = gcc
+#CC = gcc
+CC = mpicc 
 #CFLAGS = -g -fopenmp -DDEBUG_GE -DDEBUG_INTERNAL -DDEBUG_BUFFER -static -pg -lgsl -lgslcblas
 #CFLAGS = -g -fopenmp -DGE_RESTART -static -pg -lgsl -lgslcblas
-#CFLAGS = -O3 -DGE_RESTART=1 -fopenmp -static -lgsl -lgslcblas
-CFLAGS = -O3 -fopenmp -static -lgsl -lgslcblas
+CFLAGS = -O3 -DUSE_MPI -DGE_RESTART=1 -fopenmp -static -lgsl -lgslcblas
+#CFLAGS = -DUSE_MPI -O3 -fopenmp -static -lgsl -lgslcblas
+#CFLAGS = -O3 -fopenmp -static -lgsl -lgslcblas
 
 SRCS = ge_buffer.c 	\
        ge_math.c  	\

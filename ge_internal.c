@@ -4,10 +4,19 @@
 #include "ge_math.h"
 #include "common.h"
 
+#if USE_MPI
+#include <mpi.h>
+#endif 
+
 dmethods method = NONE;
 double threshold = 0.0;
 extern struct _hist_buffer history;
 int ge_freq;
+
+#if USE_MPI
+int ge_rank;
+int ge_comm_size;
+#endif
 
 /** GE Internal API definition*/
 
@@ -199,6 +208,11 @@ int ge_detect_internal_tmean_linear(vec_double_t ratio, int step)
 	}
 	// calc mean value of current time step
 	step_mean = ge_mean(ratio.array, 1, ratio.size);
+
+#if USE_MPI
+	MPI_Allreduce(&step_mean, &step_mean, 1, MPI_DOUBLE, MPI_SUM, MPI_COMM_WORLD);
+	step_mean = step_mean / ge_comm_size;
+#endif
 
 	full = ge_buffer_status();
 	if (full && step % ge_freq == 0) {
