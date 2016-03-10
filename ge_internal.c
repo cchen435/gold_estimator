@@ -184,15 +184,16 @@ int ge_detect_internal_tmean(vec_double_t ratio)
 }
 
 /**
- * ge_detect_internal_tmean_linear - detect faults using 
- *                                  tmean_linear method 
+ * ge_detect_internal_tmean_linear_global - detect faults using 
+ *      tmean_linear method. it calc the mean value globally. 
+ *
  * @ratio, change ratio of current timestep to prev timestep 
  *
  * The method is similar to linear_Fit method, but 
  * target for the mean value of each time step, 
  * not for each location
  */
-int ge_detect_internal_tmean_linear(vec_double_t ratio, int step)
+int ge_detect_internal_tmean_linear_global(vec_double_t ratio, int step)
 {
 	int i, steps, elems, full, res = GE_NORMAL;
 	double step_mean, hist_mean, a, b, predict, stdv, *x, *buffer;
@@ -213,6 +214,61 @@ int ge_detect_internal_tmean_linear(vec_double_t ratio, int step)
 	MPI_Allreduce(&step_mean, &step_mean, 1, MPI_DOUBLE, MPI_SUM, MPI_COMM_WORLD);
 	step_mean = step_mean / ge_comm_size;
 #endif
+
+	full = ge_buffer_status();
+	if (full && step % ge_freq == 0) {
+		stdv = ge_stdv(buffer, elems, steps);
+
+		x = (double *)malloc(steps * sizeof(double));
+		if (x == NULL) {
+			log_err("linear_fit, mem allocation error");
+			exit(EXIT_FAILURE);
+		}
+		for (i = 0; i < steps; i++)
+			x[i] = i;
+
+		ge_lstsq(x, buffer, &a, &b, steps, elems);
+		predict = a * (steps + 1) + b;
+#ifdef DEBUG_INTERNAL
+		fprintf(stderr, "method: %s, predict: %f, stdv: %f, \
+                mean_ratio: %f thresh: %f\n", __func__, predict, stdv, step_mean, threshold);
+#endif
+		if (fabs(predict - step_mean) > threshold * stdv) {
+			res = GE_FAULT;
+		}
+	}
+
+	ge_buffer_append(&step_mean, elems);
+	return res;
+}
+
+
+/**
+ * ge_detect_internal_tmean_linear_local - detect faults using 
+ *          tmean_linear method, it calc the mean value based local partitions
+ *
+ * @ratio, change ratio of current timestep to prev timestep 
+ *
+ * The method is similar to linear_Fit method, but 
+ * target for the mean value of each time step, 
+ * not for each location
+ */
+int ge_detect_internal_tmean_linear_local(vec_double_t ratio, int step)
+{
+	int i, steps, elems, full, res = GE_NORMAL;
+	double step_mean, hist_mean, a, b, predict, stdv, *x, *buffer;
+
+	buffer = history.data;
+	steps = history.steps;
+	elems = history.dim;
+
+	// timestep based method, history just has one data, mean change ratio
+	if (elems != 1) {
+		log_err("dimension size not match with tmean_linear method\n");
+		exit(EXIT_FAILURE);
+	}
+	// calc mean value of current time step
+	step_mean = ge_mean(ratio.array, 1, ratio.size);
 
 	full = ge_buffer_status();
 	if (full && step % ge_freq == 0) {

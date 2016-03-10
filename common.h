@@ -3,7 +3,7 @@
 
 
 
-typedef enum {NONE, THRESHOLD, TTHRESHOLD, MEAN, TMEAN, LINEAR, MEAN_LINEAR} dmethods; 
+typedef enum {NONE, THRESHOLD, TTHRESHOLD, MEAN, TMEAN, LINEAR, MEAN_LINEAR_GLOBAL, MEAN_LINEAR_LOCAL} dmethods; 
 //typedef enum {FAULT, NORMAL} ge_status;
 
 
