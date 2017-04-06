@@ -1,8 +1,11 @@
 #ifndef __GE_TYPE_H_
 #define __GE_TYPE_H_
 
+#include <stdio.h>
+#include <stdlib.h>
+#include "list.h"
 
-typedef enum {P, L, G} level_t;
+typedef enum {P, L} level_t;
 
 //typedef enum {NONE=0, THRESHOLD, TTHRESHOLD, MEAN, TMEAN, LINEAR, MEAN_LINEAR_GLOBAL, MEAN_LINEAR_LOCAL} dethods; 
 
@@ -11,24 +14,15 @@ typedef enum {P, L, G} level_t;
  * P, L, G respresent granularity
  */
 #define NONE         0
-#define THRESHOLD_P  1
-#define THRESHOLD_L  2
-#define STATISTIC_P  3
-#define STATISTIC_L  4
-#define LINEAR_P     5
-#define LINEAR_L     6
+#define LINEAR_P     1
+#define LINEAR_L     2
 
-#if USE_MPI
-#define THRESHOLD_G  7
-#define STATISTIC_G  8
-#define LINEAR_G     9
-#endif 
-typedef int dmethods;
-
-
-
+#define GE_NORMAL   0
 #define GE_FAULT	1
-#define GE_NORMAL   2
+
+// data type
+#define GE_FLOAT  1
+#define GE_DOUBLE 2
 
 struct _hist_buffer {
     int steps;			// number of target steps
@@ -37,15 +31,42 @@ struct _hist_buffer {
     double *data;		// acctual data buffer
 };
 
-typedef struct {
-    int size;
-    double *array;
-} vec_double_t;
+#define VARNAMELEN 64
+typedef struct GE_dataset {
+    char var_name[VARNAMELEN];
+    void *var; // the pointer to variable address
+    void *last; // a copy of data of last timestep, if granularity is large than 1, it is averaged on ranularity.
+    int array_size;
+    int buf_size;
+    int data_type; // 1--float, 2--double
 
-typedef struct {
-    int size;
-    float *array;
-} vec_float_t;
+    // threshold used for current variable
+    double threshold;
+    int method;
+    int window;
+    int use_chg_ratio;
+    int granularity; // do average on granularity
+
+    // the buf_list storing history data. using list data 
+    // structure for easy to remove oldest time step data
+    // and keep the time step order
+    struct list_head buf_list;
+
+    // it copy data in buf_list to an array for easy access
+    struct _hist_buffer history;
+    struct GE_dataset *next;
+} GE_dataset;
+
+#define RESULTSIZE 1024
+typedef struct GE_manager {
+    int rank;
+    int currStep;
+    short *result;
+    size_t resSize;
+    GE_dataset *head;
+} GE_manager;
+
+GE_manager manager;
 
 #define log_err(str) fprintf(stderr, "%s", str)
 

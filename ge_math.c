@@ -3,8 +3,7 @@
 #include<gsl/gsl_fit.h>
 #include<gsl/gsl_statistics_double.h>
 
-void ge_lstsq(double x[], double y[], double *a, double *b, int steps,
-	      int elems)
+void ge_lstsq(double x[], double y[], double *a, double *b, int elems, int steps)
 {
 	int i;
 	double tmp;

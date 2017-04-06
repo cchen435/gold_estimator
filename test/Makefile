@@ -1,13 +1,14 @@
 
-CC = gcc 
-FORTRAN = gfortran
-CFLAGS = -I../ -fopenmp -static -g -pg
-LDFLAGS = -L../ -L/net/hu21/cchen435/apps/gsl-2.1/lib -lm -lge -lgsl -lgslcblas
+CC = mpicc 
+FORTRAN = mpif90
+CFLAGS = -I../ -fopenmp -g -pg
+# CFLAGS = -I../ -fopenmp -static -g -pg
+LDFLAGS = -L../ -lm -lge -lgsl -lgslcblas
 
 
-EXE = ge_math_test 	 	\
+EXE = linear_test 	 	\
+	  ge_math_test 	 	\
       thresh_test 	 	\
-      linear_test 	 	\
       fortran_test 	 	\
       gsl_statistics_test 	\
       tmean_test 	 	\

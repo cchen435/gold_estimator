@@ -3,12 +3,13 @@
 
 #include <stdbool.h>
 
+#include "common.h"
 
-extern int ge_buffer_init(int window_size, int elems);
-extern int ge_buffer_append(double *buf, int elems);
-extern int ge_buffer_clean();
-extern bool ge_buffer_status();
-extern int ge_buffer_steps(); 
-extern int ge_buffer_dim();
+extern int GE_Buffer_Init(struct _hist_buffer *history, int window_size, int elems);
+extern int ge_buffer_append(GE_dataset *, double *buf, int elems);
+extern int ge_buffer_clean(GE_dataset *);
+extern bool ge_buffer_status(struct _hist_buffer);
+extern int ge_buffer_steps(struct _hist_buffer); 
+extern int ge_buffer_dim(struct _hist_buffer);
 extern double * ge_buffer_data(); 
 #endif
