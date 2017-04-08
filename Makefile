@@ -6,7 +6,7 @@ GEPATH=/opt/GESDC/
 #CFLAGS = -O3 -DUSE_MPI -DGE_RESTART=1 -fopenmp -static -lgsl -lgslcblas
 #CFLAGS = -DUSE_MPI -O3 -fopenmp -static -lgsl -lgslcblas
 #CFLAGS = -O3 -DOMP=0 -static -lgsl -lgslcblas
-CFLAGS = -g -Wall -Wextra -DOMP=0 -static -lgsl -lgslcblas
+CFLAGS = -g -Wall -Wextra -DOMP=0 -static -lgsl -lgslcblas -DDEBUG=1
 
 SRCS = ge_buffer.c 	\
        ge_math.c  	\

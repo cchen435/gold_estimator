@@ -62,6 +62,10 @@ typedef struct GE_manager {
     int rank;
     int currStep;
     short *result;
+#if DEBUG
+    double *err;
+    double *stdv;
+#endif 
     size_t resSize;
     GE_dataset *head;
 } GE_manager;

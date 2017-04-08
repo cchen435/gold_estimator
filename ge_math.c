@@ -3,13 +3,19 @@
 #include<gsl/gsl_fit.h>
 #include<gsl/gsl_statistics_double.h>
 
-void ge_lstsq(double x[], double y[], double *a, double *b, int elems, int steps)
+double ge_lstsq(double x[], double y[], double *a, double *b, int stride, int steps)
 {
-	int i;
 	double tmp;
+    double sumsq;
+	gsl_fit_linear(x, 1, y, stride, steps, b, a, &tmp, &tmp, &tmp, &sumsq);
+    return sumsq;
+}
 
-	gsl_fit_linear(x, 1, y, elems, steps, b, a, &tmp, &tmp, &tmp, &tmp);
 
+double ge_range(double data[], int stride, int size) {
+    double min, max;
+    gsl_stats_minmax(&min, &max, data, stride, size);
+    return fabs(max-min);
 }
 
 double ge_mean(double data[], int stride, int size)

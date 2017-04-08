@@ -13,6 +13,7 @@ struct _buf_list {
 	double *data;
 };
 
+void ge_buffer_clean(GE_dataset *dataset);
 
 
 void GE_Buffer_Init(struct _hist_buffer *history, int window_size, int dim)
@@ -56,13 +57,13 @@ double *ge_buffer_data(struct _hist_buffer history)
 	return history.data;
 }
 
-int ge_buffer_append(GE_dataset *dataset, double *buf, int size)
+void ge_buffer_append(GE_dataset *dataset, double *buf, int size)
 {
 	struct list_head *pos;
 	struct _buf_list *entry;
 	int i = 0;
 
-	struct _hist_buffer *history = &dataset->history;
+	struct _hist_buffer *history = &(dataset->history);
 
 	/* check whether the array size matching the expected size */
 	if (history->dim != size) {
@@ -83,11 +84,13 @@ int ge_buffer_append(GE_dataset *dataset, double *buf, int size)
 	tmp->data = (double *)malloc(size * sizeof(double));
 	if (tmp->data == NULL) {
 		perror("failed to allocate the memory at append");
-		ge_buffer_clean();
+		ge_buffer_clean(dataset);
 		exit(EXIT_FAILURE);
 	}
 
 	memcpy(tmp->data, buf, size * sizeof(double));
+
+    // fprintf(stderr, "DEBUG: [hist->steps: %d, hist->curr: %d]\n\n", history->steps, history->curr);
 
 	/* if history buf is not full, append to the end */
 	if (history->curr < history->steps) {
@@ -114,7 +117,7 @@ int ge_buffer_append(GE_dataset *dataset, double *buf, int size)
 	}
 }
 
-int ge_buffer_clean(GE_dataset *dataset)
+void ge_buffer_clean(GE_dataset *dataset)
 {
 	struct list_head *pos;
 	struct _buf_list *entry;

@@ -1,4 +1,5 @@
 
+#include <string.h>
 #include "ge.h"
 
 #if 0

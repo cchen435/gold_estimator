@@ -27,7 +27,6 @@ void GE_Finalize();
 
 /* Fortran API */
 void GE_Init_();
-void GE_Snapshot_();
 void GE_PrintResult_();
 void GE_Finalize_();
 

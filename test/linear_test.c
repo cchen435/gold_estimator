@@ -9,7 +9,7 @@ int main(int argc, char *argv)
 {
 	double temperature[10];
 	int curr_step = 0;
-	int total_time_steps = 100;
+	int total_time_steps = 50;
 	int i, result;
 
 	double max = 0.0;
