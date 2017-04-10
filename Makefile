@@ -6,7 +6,7 @@ GEPATH=/opt/GESDC/
 #CFLAGS = -O3 -DUSE_MPI -DGE_RESTART=1 -fopenmp -static -lgsl -lgslcblas
 #CFLAGS = -DUSE_MPI -O3 -fopenmp -static -lgsl -lgslcblas
 #CFLAGS = -O3 -DOMP=0 -static -lgsl -lgslcblas
-CFLAGS = -g -Wall -Wextra -DOMP=0 -static -lgsl -lgslcblas -DDEBUG=1
+CFLAGS = -g -fPIC -Wall -Wextra -DOMP=0 -static -lgsl -lgslcblas -DDEBUG=1
 
 SRCS = ge_buffer.c 	\
        ge_math.c  	\
@@ -14,14 +14,19 @@ SRCS = ge_buffer.c 	\
        ge.c	  	\
        ge_f.c
 
+SRCF = ge_interface.f90
+
 STATIC = libge.a
 
-OBJS = $(SRCS:.c=.o)
+OBJS = $(SRCS:.c=.o) $(SRCF:.f90=.o)
 
 ALL: $(STATIC)
 
 %.o: %.c
 	$(CC) -c $< -o $@ $(CFLAGS)
+
+%.o: %.f90
+	mpif90 -c $< -o $@ $(CFLAGS)
 
 $(STATIC): $(OBJS)
 	ar rcs $@ $(OBJS)
@@ -35,6 +40,7 @@ install:
 	if [ ! -d "$(GEPATH)/lib" ]; then mkdir $(GEPATH)/lib; fi
 	rm -f $(GEPATH)/include/* $(GEPATH)/lib/*
 	cp *.h $(GEPATH)/include/
+	cp ge.mod $(GEPATH)/include/
 	cp lib* $(GEPATH)/lib/
 
 uninstall:
