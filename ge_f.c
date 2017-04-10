@@ -22,13 +22,13 @@ void ge_detect_finalize_()
 }
 #endif
 
-void GE_Init_() { GE_Init(); }
+void ge_init_c_() { GE_Init(); }
 
-void GE_Snapshot_() { GE_Snapshot(); }
+void ge_snapshot_c_() { GE_Snapshot(); }
 
-void GE_PrintResult_() { GE_PrintResult(); }
+void ge_printresult_c_() { GE_PrintResult(); }
 
-void GE_Finalize_() { GE_Finalize(); }
+void ge_finalize_c_() { GE_Finalize(); }
 
 void ge_protect_1d_float_(char *var_name, int *var_name_length, int *r1,
                           float *threshold, int *window, int *method,
@@ -41,8 +41,34 @@ void ge_protect_1d_float_(char *var_name, int *var_name_length, int *r1,
                *use_chg_ratio, *granularity);
 }
 
+void ge_increase_counter_c_() {
+    size_t resSize = manager.resSize;
+    manager.currStep += 1;
+
+  if ((manager.currStep+1) % RESULTSIZE == 0) {
+    resSize += RESULTSIZE;
+
+    short *tmp = (short *)realloc(manager.result, sizeof(short) * resSize);
+    if (tmp == NULL) {
+      char msg[128];
+      sprintf(msg, "%s (%s-%d): alloc memory error\n", __func__, __FILE__,
+              __LINE__);
+      log_err(msg);
+      exit(EXIT_FAILURE);
+    }
+    manager.result = tmp;
+    manager.resSize = resSize;
+#if DEBUG
+    double *errtmp = (double *)realloc(manager.err, sizeof(double) * resSize);
+    manager.err = errtmp;
+    double *stdvtmp = (double *)realloc(manager.stdv, sizeof(double) * resSize);
+    manager.stdv = stdvtmp;
+#endif
+  }
+}
+
 void ge_protect_1d_double_(char *var_name, int *var_name_length, int *r1,
-                           float *threshold, int *window, int *method,
+                           double *threshold, int *window, int *method,
                            int *use_chg_ratio, int *granularity) {
   int i;
   char name[*var_name_length + 1];

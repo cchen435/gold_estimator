@@ -57,10 +57,6 @@ void GE_Init() {
   manager.rank = rank;
 
   manager.result = (short *)malloc((RESULTSIZE) * sizeof(short));
-#if DEBUG
-  manager.err = (double *)malloc((RESULTSIZE) * sizeof(double));
-  manager.stdv = (double *)malloc((RESULTSIZE) * sizeof(double));
-#endif 
   if (manager.result == NULL) {
     char msg[128];
     sprintf(msg, "%s (%s-%d): allocating memory for detection result error\n",
@@ -139,6 +135,7 @@ void GE_Protect_F(char *varname, int data_type, int size, double threshold,
   dataset->method = method;
   dataset->use_chg_ratio = use_chg_ratio;
   dataset->granularity = granularity;
+  dataset->buf_list.prev = dataset->buf_list.next = &(dataset->buf_list);
   dataset->next = NULL;
   dataset->last = NULL;
 
@@ -201,12 +198,6 @@ void GE_Snapshot() {
     }
     manager.result = tmp;
     manager.resSize = resSize;
-#if DEBUG
-    double *errtmp = (double *)realloc(manager.err, sizeof(double) * resSize);
-    manager.err = errtmp;
-    double *stdvtmp = (double *)realloc(manager.stdv, sizeof(double) * resSize);
-    manager.stdv = stdvtmp;
-#endif
   }
 }
 
@@ -216,7 +207,7 @@ void GE_Snapshot_1var_F(GE_dataset *pp, void *var) {
   int res;
   switch (data_type) {
     case GE_DOUBLE:
-      res = GE_Verify_d(pp, NULL);
+      res = GE_Verify_d(pp, var);
       manager.result[currStep] = res;
       break;
     default:
@@ -387,27 +378,8 @@ void GE_PrintResult() {
   fflush(fp);
   fclose(fp);
 
-#if DEBUG
-  sprintf(msg, "%d:%4.2f", 1, manager.err[1]);
-  for (i = 2; i < manager.currStep; i++) {
-    sprintf(msg, "%s %d:%4.2f", msg, i, manager.err[i]);
-  }
-
-  fprintf(stdout, "[GE rank: %d](err): %s \n", manager.rank, msg);
-  fflush(stdout);
-
-  sprintf(msg, "%d:%4.2f", 1, manager.stdv[1]);
-  for (i = 2; i < manager.currStep; i++) {
-    sprintf(msg, "%s %d:%4.2f", msg, i, manager.stdv[i]);
-  }
-
-  fprintf(stdout, "[GE rank: %d](stdv): %s \n", manager.rank, msg);
-#endif
-
-  if (msg) {
     free(msg);
     msg = NULL;
-  }
 }
 
 void GE_Finalize() {

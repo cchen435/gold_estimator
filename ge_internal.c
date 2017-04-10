@@ -90,9 +90,6 @@ int ge_detect_internal_linear(struct _hist_buffer history, double *data,
   elems = history.dim;
   buffer = history.data;
 
-  // fprintf(stderr, "DEBUG: %s (%s:%d): elems: %d\n", __func__, __FILE__,
-  // __LINE__, elems);
-
   x = (double *)malloc(steps * sizeof(double));
   if (x == NULL) {
     log_err("linear_fit, mem allocation error");
@@ -102,23 +99,14 @@ int ge_detect_internal_linear(struct _hist_buffer history, double *data,
     x[i] = i;
 
 // check whether a fault detected
-#if DEBUG
-  double max_err = 0.0;
-  double min_err = 100000.0;
-  double max_err_ratio = 0.0;
-  double min_err_ratio = 100000.0;
-  double predict1, predict2;
-  double range1, range2;
-  int count = 0;
-  int loc1, loc2;
-  double a1, b1;
-  double a2, b2;
-#endif
   for (i = 0; i < elems; i++) {
-      if (data[i] == 0) continue;
+      // skip if data is 0;
+      if (data[i] == 0.0) continue;
 
     stdv = ge_stdv(&buffer[i], elems, steps);
     ge_lstsq(x, &buffer[i], &a, &b, elems, steps);
+    // skip if predict is 0.0
+    if (a == 0.0 && b == 0.0) continue;
     //predict = a * (steps + 1) + b;
     predict = a * steps + b;
     double range;
@@ -127,64 +115,24 @@ int ge_detect_internal_linear(struct _hist_buffer history, double *data,
     else 
         range = ge_range(&buffer[i], elems, steps);
 
+    double err = fabs(data[i] - predict);
+    double theta = fabs(threshold * range);
     // if (fabs(data[i] - predict) > threshold * stdv) {
-    if (fabs(predict) > 1e-10 && fabs(data[i] - predict) > fabs(threshold * range)) {
+    if (fabs(predict) > 1e-10 && err > fabs(threshold * range)) {
       res = GE_FAULT;
-#if DEBUG
-      //log_err("fault detected\n");
-      double err = fabs(data[i] - predict);
-      double err_ratio = err/fabs(predict);
-      if (err > max_err) {
-          max_err = err;
-          loc1 = i;
-          predict1 = predict;
-          range1 = range;
-          a1 = a;
-          b1 = b;
-      }
-      if (err_ratio > max_err_ratio) {
-          max_err_ratio = err_ratio;
-          loc2 = i;
-          predict2 = predict;
-          range2 = range;
-          a2 = a;
-          b2 = b;
-      }
 
-      if (min_err > err)
-          min_err = err;
-      if (min_err_ratio > err_ratio)
-          min_err_ratio = err_ratio;
-
-      count++;
-
-      manager.err[manager.currStep] = fabs(data[i] - predict) / data[i];
-      manager.stdv[manager.currStep] = stdv;
-#else
-      break;
-#endif
-    }
-  }
-#if DEBUG
-  if (res == GE_FAULT) { 
-      fprintf(stderr, "\n\n\n        [prediction error statistic: ] max: %f, "
-            "max ratio: %f, min: %f, min ratio: %f, points: %f\n", 
-            max_err, max_err_ratio, min_err, min_err_ratio, count*1.0/elems);
-
-      fprintf(stderr, "        [max err (%d)]: \n            ", loc1);
-      for (i = 0; i < steps; i++)
-        fprintf(stderr, "%d: %.12f ", i, buffer[loc1 + i * elems]);
-      fprintf(stderr, "\n            [a]: %f, [b]: %f, [predict]: %.12f, [observed]: %.12f, [err]: %.12f, [range]: %.12f ", 
-              a1, b1, predict1, data[loc1], fabs(data[loc1]-predict1), range1);
-
-      fprintf(stderr, "\n        [max err ratio (%d)]:\n            ", loc2);
-      for (i = 0; i < steps; i++)
-        fprintf(stderr, "%d: %.12f ", i, buffer[loc2 + i * elems]);
-      fprintf(stderr, "\n            [a]: %f, [b]: %f, [predict]: %.12f, [observed]: %.12f, [err]: %.12f, [range]: %.12f ", 
-              a2, b2, predict2, data[loc2], fabs(data[loc2]-predict2), range2);
+      fprintf(stderr, "\n\n\n        [predict statistic (%d)]: \n            ", i);
+      int j;
+      for (j = 0; j < steps; j++)
+        fprintf(stderr, "%d: %.12f ", j, buffer[i + j * elems]);
+      fprintf(stderr, "\n            [a]: %f, [b]: %f, [predict]: %.12f, [observed]: %.12f, "
+              "[err]: %.12f, [range]: %.12f, [threshold]: %.12f, [theta]: %.12f ", 
+              a, b, predict, data[i], err, range, threshold, theta);
 
       fprintf(stderr, "\n\n\n");
+
+      break;
+    }
   }
-#endif 
   return res;
 }

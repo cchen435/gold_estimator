@@ -16,15 +16,19 @@ MODULE GE
     CONTAINS
 
     subroutine GE_Init
-        CALL GE_Init_()
+        CALL GE_Init_c()
     end subroutine GE_Init
 
+    subroutine GE_Increase_Counter
+        CALL GE_Increase_Counter_c()
+    end subroutine GE_Increase_Counter
+
     subroutine GE_PrintResult
-        CALL GE_PrintResult_()
+        CALL GE_PrintResult_c()
     end subroutine GE_PrintResult
 
     subroutine GE_Finalize
-        CALL GE_Finalize_()
+        CALL GE_Finalize_c()
     end subroutine GE_Finalize
 
     subroutine GE_Protect_Fortran_var_REAL_K4(VARNAME, VAR, THRESHOLD, WINDOW, METHOD, USE_CHG_RATIO, GRANULARITY)
