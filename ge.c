@@ -64,6 +64,7 @@ void GE_Init() {
     perror(msg);
     exit(EXIT_FAILURE);
   }
+  memset(manager.result, 0, RESULTSIZE*sizeof(short));
   manager.currStep = 1;
   manager.head = NULL;
 }
@@ -196,6 +197,7 @@ void GE_Snapshot() {
       log_err(msg);
       exit(EXIT_FAILURE);
     }
+    memset(tmp+resSize-RESULTSIZE, 0, RESULTSIZE * sizeof(short));
     manager.result = tmp;
     manager.resSize = resSize;
   }
@@ -208,7 +210,7 @@ void GE_Snapshot_1var_F(GE_dataset *pp, void *var) {
   switch (data_type) {
     case GE_DOUBLE:
       res = GE_Verify_d(pp, var);
-      manager.result[currStep] = res;
+      manager.result[currStep] |= res;
       break;
     default:
       perror("data_type not supported yet\n");
