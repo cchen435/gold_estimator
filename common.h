@@ -2,20 +2,30 @@
 #define __GE_TYPE_H_
 
 
+typedef enum {P, L, G} level_t;
 
-typedef enum {NONE, THRESHOLD, TTHRESHOLD, MEAN, TMEAN, LINEAR, MEAN_LINEAR_GLOBAL, MEAN_LINEAR_LOCAL} dmethods; 
-//typedef enum {FAULT, NORMAL} ge_status;
+//typedef enum {NONE=0, THRESHOLD, TTHRESHOLD, MEAN, TMEAN, LINEAR, MEAN_LINEAR_GLOBAL, MEAN_LINEAR_LOCAL} dethods; 
 
+/* define detecting kernel methods
+ * based on threshold, statisitc and linear regression
+ * P, L, G respresent granularity
+ */
+#define NONE         0
+#define THRESHOLD_P  1
+#define THRESHOLD_L  2
+#define STATISTIC_P  3
+#define STATISTIC_L  4
+#define LINEAR_P     5
+#define LINEAR_L     6
 
-#if 0
-#define METHOD_MIN	 0
-#define THRESHOLD        1
-#define MEAN    	 2
-#define TMEAN    	 3
-#define LINEAR  	 4
-#define MEAN_LINEAR	 5
-#define METHOD_MAX	 6
+#if USE_MPI
+#define THRESHOLD_G  7
+#define STATISTIC_G  8
+#define LINEAR_G     9
 #endif 
+typedef int dmethods;
+
+
 
 #define GE_FAULT	1
 #define GE_NORMAL   2

@@ -1,4 +1,7 @@
+#if OMP
 #include <omp.h>
+#endif
+
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -19,7 +22,6 @@
 extern dmethods method;
 extern double threshold;
 extern struct _hist_buffer history;
-
 extern int ge_freq;
 
 #if USE_MPI
@@ -80,25 +82,23 @@ void ge_detect_init(dmethods m, int array_size, int win_size, double thresh,
 #endif
 
 	switch (m) {
-	case THRESHOLD:
-	case TTHRESHOLD:
-		break;
-	case LINEAR:
-	case MEAN:
+	case LINEAR_P:
+	case STATISTIC_P:
 		if (threshold < 1.0) {
-			log_err
-			    ("for linear, mean, tmean, mean_linear, threhsold"
+			log_err ("for linear, mean, tmean, mean_linear, threhsold"
 			     "represnts number of stdvs, be larger then 1.\n");
 			exit(EXIT_FAILURE);
 		}
 		ge_buffer_init(win_size, array_size);
 		break;
-	case TMEAN:
-	case MEAN_LINEAR_GLOBAL:
-	case MEAN_LINEAR_LOCAL:
+	case LINEAR_L:
+	case STATISTIC_L:
+#if USE_MPI
+    case LINEAR_G:
+	case STATISTIC_G:
+#endif
 		if (threshold < 1.0) {
-			log_err
-			    ("detect_init: for linear, mean, tmean, mean_linear,"
+			log_err ("detect_init: for linear, mean, tmean, mean_linear,"
 			     "threhsold represnts number of stdvs,"
 			     "be larger then 1");
 			exit(EXIT_FAILURE);
@@ -107,6 +107,7 @@ void ge_detect_init(dmethods m, int array_size, int win_size, double thresh,
 		break;
 	default:
 		log_err("detect_init: undefined method\n");
+        exit(-1);
 	}
 }
 
@@ -119,7 +120,7 @@ void ge_detect_init(dmethods m, int array_size, int win_size, double thresh,
 int ge_detect_verify(double *buf, int buf_size, int step)
 {
 	int i, result;
-	vec_double_t ratio;
+	vec_double_t ratio, mean_ratio;
 
 	/* used for checking false positives */
 	int tmp_step, size;
@@ -145,7 +146,7 @@ int ge_detect_verify(double *buf, int buf_size, int step)
 	if (last.array == NULL) {
 		// process based on absolute value to avoid divide by zeros
 		for (i = 0; i < buf_size; i++) {
-			tmp[i] = abs(buf[i]);
+			tmp[i] = buf[i];
 		}
 		last.array = tmp;
 		return GE_NORMAL;
@@ -155,19 +156,42 @@ int ge_detect_verify(double *buf, int buf_size, int step)
 #endif
 	ratio.array = (double *)malloc(sizeof(double) * buf_size);
 	if (ratio.array == NULL) {
-		log_err("detect_verify at line 113: alloc memory error\n");
+		log_err("detect_verify at line 158: alloc memory error\n");
 		exit(-1);
 	}
-
 	ratio.size = buf_size;
+	
+    mean_ratio.array = (double *)malloc(sizeof(double));
+	if (ratio.array == NULL) {
+		log_err("detect_verify at line 165: alloc memory error\n");
+		exit(-1);
+	}
+	mean_ratio.size = 1;
 
 	// calc change ratio
+#if OMP
 	#pragma omp parallel for 
+#endif
 	for (i = 0; i < buf_size; i++) {
-		tmp[i] = abs(buf[i]);
-		last.array[i] += 1.0;
-		ratio.array[i] = tmp[i] / last.array[i] - 1;
+		tmp[i] = buf[i];
+		ratio.array[i] = (tmp[i] - last.array[i])/ (fabs(last.array[i]) + 1);
 	}
+
+    switch(method) {
+        case THRESHOLD_L:
+        case STATISTIC_L:
+        case LINEAR_L:
+            mean_ratio.array[0] = ge_mean(ratio.array, 1, ratio.size);
+#if USE_MPI
+        case THRESHOLD_G:
+        case STATISTIC_G:
+        case LINEAR_G:
+            mean_ratio.array[0] = ge_mean(ratio.array, 1, ratio.size)
+            MPI_Allreduce(&mean_ratio.array[0], &mean_ratio.array[0], 1, \
+                    MPI_DOUBLE, MPI_SUM, MPI_COMM_WORLD);
+            mean_ratio.array[0] /= ge_comm_size;
+#endif 
+    }
 
 #if DEBUG
 	ratiot = timer();
@@ -181,27 +205,35 @@ int ge_detect_verify(double *buf, int buf_size, int step)
 #endif
 	// call related method
 	switch (method) {
-	case THRESHOLD:
+	case THRESHOLD_P:
 		result = ge_detect_internal_threshold(ratio);
 		break;
-	case TTHRESHOLD:
-		result = ge_detect_internal_tthreshold(ratio);
+	case THRESHOLD_L:
+		result = ge_detect_internal_threshold(mean_ratio);
 		break;
-	case LINEAR:
-		result = ge_detect_internal_linear_fit(ratio);
+	case STATISTIC_P:
+		result = ge_detect_internal_statistic(ratio);
 		break;
-	case MEAN:
-		result = ge_detect_internal_mean(ratio);
+	case STATISTIC_L:
+		result = ge_detect_internal_statistic(mean_ratio);
 		break;
-	case TMEAN:
-		result = ge_detect_internal_tmean(ratio);
+	case LINEAR_P:
+		result = ge_detect_internal_linear(ratio);
 		break;
-	case MEAN_LINEAR_GLOBAL:
-		result = ge_detect_internal_tmean_linear_global(ratio, step);
+	case LINEAR_L:
+		result = ge_detect_internal_linear(mean_ratio);
 		break;
-	case MEAN_LINEAR_LOCAL:
-		result = ge_detect_internal_tmean_linear_local(ratio, step);
+#if USE_MPI
+	case THRESHOLD_G:
+		result = ge_detect_internal_threshold(mean_ratio);
 		break;
+	case STATISTIC_G:
+		result = ge_detect_internal_statistic(mean_ratio);
+		break;
+	case LINEAR_G:
+		result = ge_detect_internal_linear(mean_ratio);
+		break;
+#endif
 	default:
 		log_err("method not defined\n");
 	}
@@ -233,7 +265,7 @@ int ge_detect_verify(double *buf, int buf_size, int step)
 			size = fscanf(fp, "%d %lf\n", &tmp_step, &tmp_mean);
 			if (size == 0)
 				break;
-			if (tmp_step == step && abs(tmp_mean - mean) < 0.00001) {
+			if (tmp_step == step && fabs(tmp_mean - mean) < 0.00001) {
 				result = GE_NORMAL;
 				break;
 			}
@@ -275,24 +307,21 @@ void ge_detect_finalize()
 		free(last.array);
 	ge_buffer_clean();
 
-    printf("rank %d, line %d\n", ge_rank,__LINE__);
 #if USE_MPI
     int num;
     int j, k;
     int recvbuf[1024];
     if (ge_rank != 0) {
-       printf("rank %d, line %d\n", ge_rank,__LINE__);
        MPI_Send(&faults.num, 1, MPI_INT, 0, ge_rank, MPI_COMM_WORLD);
        MPI_Send(faults.fsteps, faults.num, MPI_INT, 0, ge_rank, MPI_COMM_WORLD);
     } else {
-        printf("rank %d, line %d\n", ge_rank,__LINE__);
         for ( i = 1; i < ge_comm_size; i++) {
-            printf("recieving from process %d (com size %d)", i, ge_comm_size);
             MPI_Recv(&num, 1, MPI_INT, i, i, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
             MPI_Recv(recvbuf, num, MPI_INT, i, i, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
             for ( j = faults.num, k = 0; k < num; j++, k++ )
-                printf("recieving faults %d (total %d)", k, num);
                 faults.fsteps[j] = recvbuf[k];
+                printf("recieving faults %d from PID %d (total %d) %d\n", \
+                        recvbuf[k], i, num, faults.fsteps[j]);
             faults.num += num;
         } 
     }

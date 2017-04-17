@@ -1,8 +1,8 @@
 
-CC = gcc
+CC = gcc 
 FORTRAN = gfortran
 CFLAGS = -I../ -fopenmp -static -g -pg
-LDFLAGS = -L../ -lge -lgsl -lgslcblas -lm
+LDFLAGS = -L../ -L/net/hu21/cchen435/apps/gsl-2.1/lib -lm -lge -lgsl -lgslcblas
 
 
 EXE = ge_math_test 	 	\
