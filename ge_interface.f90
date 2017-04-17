@@ -7,10 +7,10 @@ MODULE GE
         MODULE PROCEDURE GE_Protect_Fortran_var_REAL_K8
     end interface ! GE_Protect
 
-    interface GE_Snapshot
+    interface GE_Snapshot_Fortran
         MODULE PROCEDURE GE_Snapshot_Fortran_REAL_K4
         MODULE PROCEDURE GE_Snapshot_Fortran_REAL_K8
-    end interface ! GE_Snapshot
+    end interface ! GE_Snapshot_Fortran
 
 
     CONTAINS

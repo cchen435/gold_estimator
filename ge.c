@@ -160,7 +160,7 @@ void GE_Protect_F(char *varname, int data_type, int size, double threshold,
  */
 
 void GE_Snapshot() {
-  int res;
+  int res = GE_NORMAL;
   int currStep = manager.currStep;
   size_t resSize = manager.resSize;
   GE_dataset *pp = manager.head;
@@ -171,16 +171,16 @@ void GE_Snapshot() {
     data_type = pp->data_type;
     switch (data_type) {
       case GE_DOUBLE:
-        res = GE_Verify_d(pp, NULL);
-        manager.result[currStep] = res;
+        res |= GE_Verify_d(pp, NULL);
         break;
       default:
         perror("data_type not supported yet\n");
         exit(EXIT_FAILURE);
     }
-    if (res == GE_FAULT) break;
+    //if (res == GE_FAULT) break;
     pp = pp->next;
   }
+  manager.result[currStep] = res;
 
   currStep++;
   manager.currStep = currStep;
