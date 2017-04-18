@@ -1,7 +1,3 @@
-#if OMP
-#include <omp.h>
-#endif
-
 #include <assert.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -21,9 +17,9 @@
 extern int ge_freq;
 
 #if DEBUG
-//#if USING_MPI
+#if USING_MPI
 extern double timer();
-//#else
+#else
 #if 0
 double timer()
 {
@@ -33,21 +29,12 @@ double timer()
 }
 #endif
 #endif
+#endif
 
-struct {
-  int num;
-  // int tsteps;
-  int fsteps[1024];
-} faults;
 
 /* GE API definition */
 /**
- * ge_detect_init -- initialize the library
- * @method: the detection method
- * @win_size: window size of buffer
- * @thresh: threshold value used for threshold method
- *          or threshold to measure the difference between
- *          and actual value
+ * GE_Init -- initialize the library
  */
 int GE_Verify_d(GE_dataset *dataset, void *var);
 
@@ -69,11 +56,26 @@ void GE_Init() {
   manager.head = NULL;
 }
 
+/**
+ * GE_Protect -- specify the variable to be protected, and related parameters
+ * for it
+ * @varname, variable name
+ * @var, memory address of variable
+ * @datatype, specify the data type of data element
+ * @size: variable array size; considered it as 1D array
+ * @thresh: threshold value used for threshold method
+ *          or threshold to measure the difference between
+ *          and actual value
+ * @window: window size of buffer
+ * @method: the detection method, currently support LINEAR_L and LINEAR_P
+ * @use_chg_ratio: working on change ratio or raw data
+ * @granularity: used only for LINEAR_P method to indicate how to group data
+ * elements
+ */
 void GE_Protect(char *varname, void *var, int data_type, int size,
                 double threshold, int window, int method, int use_chg_ratio,
                 int granularity) {
   GE_dataset *dataset = (GE_dataset *)malloc(sizeof(GE_dataset));
-  // fprintf(stderr, "DEBUG: %s -- %s:%d\n", __func__, __FILE__, __LINE__);
 
   if (dataset == NULL) {
     char msg[128];
@@ -112,6 +114,13 @@ void GE_Protect(char *varname, void *var, int data_type, int size,
 
 }
 
+/*
+ * GE_Protect_F -- GE_Protect API for Fortran
+ * As for fortran, the address of the variable 
+ * passed to the function will be changed, 
+ * so need to pass it to Snapshot API in each iteration 
+ */
+
 void GE_Protect_F(char *varname, int data_type, int size, double threshold,
                   int window, int method, bool use_chg_ratio, int granularity) {
   GE_dataset *dataset = (GE_dataset *)malloc(sizeof(GE_dataset));
@@ -124,10 +133,6 @@ void GE_Protect_F(char *varname, int data_type, int size, double threshold,
   }
 
   sprintf(dataset->var_name, varname);
-  // as for fortran, the address of the variable passed to the function will be
-  // changed,
-  // so need to pass it in each iteration
-  // dataset->var = var;
   dataset->var = NULL;
   dataset->data_type = data_type;
   dataset->array_size = size;
@@ -153,13 +158,14 @@ void GE_Protect_F(char *varname, int data_type, int size, double threshold,
   manager.head = dataset;
 }
 
-/* verify the current state. first calc the
-   change ratio, then evaluate the change ratio
-   if no fault detected, append the change ratio
-   to history buf. otherwise quit the application
-   it should be an MPI version for sync quit
+/* 
+ * GE_Snapshot -- API called at each iteratio to predict 
+ * the value of currentstep, and compare it to observed 
+ * value for fault detection. It firstly calc the change 
+ * ratio (if use_chg_ratio is true), and then append the
+ * data to history buf. otherwise quit the application
+ * It iterates all resgistered variables
  */
-
 void GE_Snapshot() {
   int res = GE_NORMAL;
   int currStep = manager.currStep;
@@ -203,6 +209,9 @@ void GE_Snapshot() {
   }
 }
 
+/* 
+ * GE_Snapshot_1var_F -- Fortran API for GE_Snapshot, it works on one variable 
+ */
 void GE_Snapshot_1var_F(GE_dataset *pp, void *var) {
   int currStep = manager.currStep;
   int data_type = pp->data_type;
@@ -218,19 +227,17 @@ void GE_Snapshot_1var_F(GE_dataset *pp, void *var) {
   }
 }
 
-// verify on double data type
+/*
+ * GE_Verify_d -- predict and compare the prediction with observed data to 
+ * flag faults. GE_Snapshot and GE_Snapshot_1var_F rely on it
+ */ 
 int GE_Verify_d(GE_dataset *dataset, void *var) {
   assert(dataset != NULL);
-    // fprintf(stderr, "DEBUG (%dth step): %s -- %s:%d\n", manager.currStep, __func__, __FILE__, __LINE__);
-
-  // make sure the buf_size is correct
   int method = dataset->method;
   int buf_size = dataset->buf_size;
   int array_size = dataset->array_size;
   int granularity = dataset->granularity;
   int use_chg_ratio = dataset->use_chg_ratio;
-
-  // assert(buf_size == array_size / granularity);
 
   int i, j, result;
   double *data, *workset, mean;
@@ -267,13 +274,10 @@ int GE_Verify_d(GE_dataset *dataset, void *var) {
 
   if (use_chg_ratio) {  // the buf stores change ratios instead of raw data
                         // first time step recording data only
-    // fprintf(stderr, "DEBUG (%dth step): %s -- %s:%d\n", manager.currStep, __func__, __FILE__, __LINE__);
     if (dataset->last == NULL) {
       dataset->last = tmp;
       return GE_NORMAL;
     }
-    // fprintf(stderr, "DEBUG (%dth step): %s -- %s:%d\n", manager.currStep, __func__, __FILE__, __LINE__);
-
     // calc and record ratio info
     workset = (double *)malloc(sizeof(double) * buf_size);
     if (workset == NULL) {
@@ -285,12 +289,10 @@ int GE_Verify_d(GE_dataset *dataset, void *var) {
     }
 
     double *last = (double *)dataset->last;
-    // fprintf(stderr, "DEBUG: %s -- %s:%d\n", __func__, __FILE__, __LINE__);
     for (i = 0; i < buf_size; i++)
       workset[i] = (tmp[i] - last[i]) / (fabs(last[i]) + 1);
 
     // update the last
-    // fprintf(stderr, "DEBUG: %s -- %s:%d\n", __func__, __FILE__, __LINE__);
     free(last);
     dataset->last = tmp;
   } else {  // end of use_chg_ratio and start of working on raw data
@@ -298,20 +300,18 @@ int GE_Verify_d(GE_dataset *dataset, void *var) {
   }
 
   mean = ge_mean(workset, 1, buf_size);
-    // fprintf(stderr, "DEBUG: %s -- %s:%d\n", __func__, __FILE__, __LINE__);
   // check whether the buffer is full
-  int full = ge_buffer_status(dataset->history);
+  int full = GE_Buffer_Status(dataset->history);
   if (!full) {
-      // fprintf(stderr, "\n\nDEBUG: [currStep: %d]: hist buffer not full\n\n", manager.currStep);
     result = GE_NORMAL;
   } else {
     switch (method) {
       case LINEAR_L:
-        result = ge_detect_internal_linear(dataset->history, &mean,
+        result = GE_Internal_Linear(dataset->history, &mean,
                                            dataset->threshold);
         break;
       case LINEAR_P:
-        result = ge_detect_internal_linear(dataset->history, workset,
+        result = GE_Internal_Linear(dataset->history, workset,
                                            dataset->threshold);
         break;
       default:
@@ -322,10 +322,10 @@ int GE_Verify_d(GE_dataset *dataset, void *var) {
 
     switch (method) {
       case LINEAR_L:
-        ge_buffer_append(dataset, &mean, 1);
+        GE_Buffer_Append(dataset, &mean, 1);
         break;
       case LINEAR_P:
-        ge_buffer_append(dataset, workset, buf_size);
+        GE_Buffer_Append(dataset, workset, buf_size);
         break;
       default:
         perror("Unknown method\n");
@@ -347,10 +347,22 @@ void GE_PrintResult() {
   char *msg;
   int i = manager.currStep;
   int digits = 0;
+  short *res_buffer = (short *) malloc(sizeof(short) * i);
+  if (res_buffer == NULL) {
+    perror("allocate memory for res buffer failed\n");
+    exit(EXIT_FAILURE);
+  }
+  memset(res_buffer, 0, sizeof(short) * i);
+  MPI_Reduce(manager.result, res_buffer, i, MPI_SHORT, MPI_LOR, 0, MPI_COMM_WORLD);
+
+  if (manager.rank != 0)
+      return;
+
   while (i > 0) {
     digits++;
     i = i / 10;
   }
+
 #if DEBUG
   int msg_size = manager.currStep * (digits + 14);
 #else 
@@ -370,25 +382,27 @@ void GE_PrintResult() {
   fprintf(stdout, "[GE rank: %d]: %s \n", manager.rank, msg);
   fflush(stdout);
 
-  char fname[64] = "ge_detect_result.txt";
+  char fname[32] = "GE_Result.txt";
   FILE *fp = fopen(fname, "a+");
   if (fp == NULL) {
-    perror("open ge_detect_result.txt error\n");
+    perror("open GE_Result.txt error\n");
     exit(EXIT_FAILURE);
   }
   fprintf(fp, "[GE rank: %d]: %s \n", manager.rank, msg);
   fflush(fp);
   fclose(fp);
 
-    free(msg);
-    msg = NULL;
+  free(msg);
+  msg = NULL;
 }
 
 void GE_Finalize() {
   GE_dataset *pp = manager.head;
+  
+  // free buffer allocated for each dataset 
   while (pp != NULL) {
     if (pp->last) free(pp->last);
-    ge_buffer_clean(pp);
+    GE_Buffer_Clean(pp);
     free((pp->history).data);
     GE_dataset *tmp = pp;
     pp = pp->next;

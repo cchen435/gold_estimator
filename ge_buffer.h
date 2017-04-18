@@ -6,10 +6,10 @@
 #include "common.h"
 
 extern void GE_Buffer_Init(struct _hist_buffer *history, int window_size, int elems);
-extern void ge_buffer_append(GE_dataset *, double *buf, int elems);
-extern void ge_buffer_clean(GE_dataset *);
-extern bool ge_buffer_status(struct _hist_buffer);
-extern int ge_buffer_steps(struct _hist_buffer); 
-extern int ge_buffer_dim(struct _hist_buffer);
-extern double * ge_buffer_data(); 
+extern void GE_Buffer_Append(GE_dataset *, double *buf, int elems);
+extern void GE_Buffer_Clean(GE_dataset *);
+extern bool GE_Buffer_Status(struct _hist_buffer);
+extern int GE_Buffer_Steps(struct _hist_buffer); 
+extern int GE_Buffer_Dim(struct _hist_buffer);
+extern double * GE_Buffer_Data(); 
 #endif

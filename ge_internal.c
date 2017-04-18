@@ -18,69 +18,16 @@ extern struct _hist_buffer history;
 int ge_freq;
 */
 
-#if USE_MPI
-int ge_rank;
-int ge_comm_size;
-#endif
-
 /** GE Internal API definition*/
-#if 0
 /**
- * ge_dtect_internal_threshold - detect the error using threshold
- * @ratio, change ratio of current timestep to prev timestep
- */
-int ge_detect_internal_threshold(vec_double_t ratio) {
-  int i;
-  for (i = 0; i < ratio.size; i++)
-    if (fabs(ratio.array[i]) > threshold) return GE_FAULT;
-  return GE_NORMAL;
-}
-
-/**
- * ge_detect_internal_mean - using mean method to detect error
- * @ratio, change ratio of current timestep to prev timestep
- *
- * The method compares the current change ratio to the mean
- * value of history change ratio for each loaction
- */
-int ge_detect_internal_statistic(vec_double_t ratio) {
-  int i, j, steps, elems;
-  static int res;
-  double *buffer = history.data;
-
-  int full = ge_buffer_status();
-
-  res = GE_NORMAL;
-
-  if (full) {
-    steps = history.steps;
-    elems = history.dim;
-
-    for (i = 0; i < elems; i++) {
-      double mean, stdv;
-      stdv = ge_stdv(&buffer[i], elems, steps);
-      mean = ge_mean(&buffer[i], elems, steps);
-      if (fabs(ratio.array[i] - mean) > threshold * stdv) {
-        res = GE_FAULT;
-        break;
-      }
-    }
-  } else {
-    printf("mean: buffer is not full\n");
-  }
-  ge_buffer_append(ratio.array, ratio.size);
-  return res;
-}
-#endif
-/**
- * ge_detect_internal_linear - detect faults using linear fit method
+ * GE_Internal_Linear - detect faults using linear fit method
  * @ratio, change ratio of current timestep to prev timestep
  *
  * The method treat the change ratio of successive timesteps as a linear
  * function, using the history data to estimate the linear parameters for
  * each location
  */
-int ge_detect_internal_linear(struct _hist_buffer history, double *data,
+int GE_Internal_Linear(struct _hist_buffer history, double *data,
                               double threshold) {
   double *x, *buffer;
   double a, b, predict, stdv, range, err, theta, sumsq;
@@ -140,16 +87,6 @@ int ge_detect_internal_linear(struct _hist_buffer history, double *data,
     if (fabs(predict) > 1e-10 && err > fabs(threshold * range)) {
       res = GE_FAULT;
 #if 0
-      fprintf(stdout, "\n\n\n        [predict statistic (%d)]: \n            ", i);
-      int j;
-      for (j = 0; j < steps; j++)
-        fprintf(stdout, "%d: %.12f ", j, buffer[i + j * elems]);
-      fprintf(stdout, "\n            [a]: %f, [b]: %f, [predict]: %.12f, [observed]: %.12f, "
-              "[err]: %.12f, [range]: %.12f, [threshold]: %.12f, [theta]: %.12f ", 
-              a, b, predict, data[i], err, range, threshold, theta);
-
-      fprintf(stdout, "\n\n\n");
-
       break;
 #endif
     }
