@@ -8,7 +8,7 @@ double ge_lstsq(double x[], double y[], double *a, double *b, int stride, int st
 	double tmp;
     double sumsq;
 	gsl_fit_linear(x, 1, y, stride, steps, b, a, &tmp, &tmp, &tmp, &sumsq);
-    return sumsq;
+    return sqrt(sumsq/steps);
 }
 
 

@@ -1,5 +1,7 @@
 
 #include<stdio.h>
+#include <math.h>
+
 #include "ge_math.h"
 
 /**
@@ -63,18 +65,17 @@ int main()
 	printf("\n\n");
 
     double x2[3] = {0,1,2};
-    int x3[3] = {1,2,3};
-    double b1[9] = { 0.000000000000, 1, 2, 
-                      -0.000001615434, 3, 4, 
-                      -0.000003671474, 5, 6};
-    double b2[3] = { 0.000000000000, -0.000001615434, -0.000003671474};
-    double sumsq = ge_lstsq(x2, b1, &a, &c, 3, 3);
-    printf("b1[0]: %.12f, b1[1]: %.12f, b1[2]: %.12f\n", b2[0], b2[1], b2[2]);
-	printf("a=%.12f, c=%.12f, sumsq=%.12f\n", a, c, sumsq);
-    printf("b1[0]: %.12f, b1[1]: %.12f, b1[2]: %.12f, b1[3]: %.12f, b1[4]: %.12f, b1[5]: %.12f\n", c, a+c, 2*a+c ,a*3+c, a*4+c, a*5+c);
-    sumsq = ge_lstsq(x2, b2, &a, &c, 1, 3);
-	printf("a=%.12f, c=%.12f, sumsq=%.12f\n", a, c, sumsq);
-    printf("b1[0]: %.12f, b1[1]: %.12f, b1[2]: %.12f, b1[3]: %.12f, b1[4]: %.12f, b1[5]: %.12f\n", c, a+c, 2*a+c ,a*3+c, a*4+c, a*5+c);
+    double y2[3] = {1,6,9};
+    double sumsq = ge_lstsq(x2, y2, &a, &c, 1, 3);
+    double tmp = 0.0;
+    printf("predict: ");
+    for (i = 0; i < 3; i++) {
+        double predict = a * x2[i] + c;
+        printf("%d:%.24f, ", i, predict);
+        tmp += pow(predict- y2[i], 2);
+    }
+	printf("\n\nerr: %.24f, sumsq=%.24f\n", tmp, sumsq);
+
 
 	return 0;
 

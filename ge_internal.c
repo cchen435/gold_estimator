@@ -9,15 +9,6 @@
 #include <mpi.h>
 #endif
 
-level_t level;
-
-/*
-int method = NONE;
-double threshold = 0.0;
-extern struct _hist_buffer history;
-int ge_freq;
-*/
-
 /** GE Internal API definition*/
 /**
  * GE_Internal_Linear - detect faults using linear fit method
@@ -96,16 +87,16 @@ int GE_Internal_Linear(struct _hist_buffer history, double *data,
       for (i = 0; i < steps; i++)
         fprintf(stdout, "%d: %.12f ", i, buffer[loc + i * elems]);
       fprintf(stdout, "\n       [a]: %.12f, [b]: %.12f \n       [predict]: %.12f, [observed]: %.12f \n       "
-              "[err]: %.12f, [range]: %.12f\n       [theta]: %.12f, [err/range]: %.12f , [err/stdv]: %.12f , [err/sumsq]: %.12f", 
-              max_a, max_b, max_predict, data[loc], max_err, max_range, max_theta, max_err/max_range, max_err/max_stdv, max_err/max_sumsq);
+              "[err]: %.12f, [range]: %.12f, [sumsq]: %.12f\n       [theta]: %.12f, [err/range]: %.12f , [err/stdv]: %.12f , [err/sumsq]: %.12f", 
+              max_a, max_b, max_predict, data[loc], max_err, max_range, max_sumsq, max_theta, max_err/max_range, max_err/max_stdv, max_err/max_sumsq);
       fprintf(stdout, "\n\n\n");
   } else if (elems == 1) {
       fprintf(stdout, "\n\n\n   [predict statistic (%d)]: \n        history: ", 0);
       for (i = 0; i < steps; i++)
         fprintf(stdout, "%d: %.12f ", i, buffer[i * elems]);
       fprintf(stdout, "\n       [a]: %.12f, [b]: %.12f \n       [predict]: %.12f, [observed]: %.12f \n       "
-              "[err]: %.12f, [range]: %.12f\n       [theta]: %.12f , [err/range]: %.12f , [err/stdv]: %.12f , [err/sumsq]: %.12f", 
-              a, b, predict, data[0], err, range, theta, err/range, err/stdv, err/sumsq);
+              "[err]: %.12f, [range]: %.12f, [sumsq]:%.12f\n       [theta]: %.12f , [err/range]: %.12f , [err/stdv]: %.12f , [err/sumsq]: %.12f", 
+              a, b, predict, data[0], err, range, sumsq, theta, err/range, err/stdv, err/sumsq);
       fprintf(stdout, "\n\n\n");
       fflush(stdout);
   }
